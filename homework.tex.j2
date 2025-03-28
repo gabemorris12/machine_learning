@@ -20,7 +20,7 @@
     \fancypagestyle{fancyheader}{
         \fancyhf{} % clear all header and footer fields
         \fancyhead[L]{ME 6990\\} % Left header
-        \fancyhead[C]{Homework 4\\} % Center header
+        \fancyhead[C]{Homework 5\\} % Center header
         \fancyhead[R]{Gabe Morris\\gnm54\vspace{0.005in}} % Right header
         \fancyfoot[C]{\thepage} % Footer
         \renewcommand{\headrulewidth}{0.4pt} % Line under the header
@@ -42,6 +42,11 @@
     \titleformat{\subsubsection}
       {\normalfont\normalsize\bfseries\color{maroon}} % And for subsubsections
       {\thesubsubsection}{1em}{}
+
+    \newtcolorbox{highlightedoutput}[1][]{%
+    colback=yellow!10, colframe=yellow!50, coltitle=black,
+    title=Answer, #1
+    }
 ((* endblock commands *))
 
 ((* block abstract *))
@@ -79,6 +84,32 @@ Gabe Morris
     ((* endif *))
 
 ((* endblock any_cell *))
+
+((=
+The macro in style_jupyter needs to be updated to add the following:
+
+((* macro draw_prompt(cell, prompt, prompt_color, extra_space) -*))
+    ((*- if cell.execution_count is defined -*))
+    ((*- set execution_count = "" ~ (cell.execution_count | replace(None, " ")) -*))
+    ((*- else -*))((*- set execution_count = " " -*))((*- endif *))
+
+    ((*- if (resources.global_content_filter.include_output_prompt and prompt == 'Out' and "highlight-output" not in cell.metadata.tags)
+         or (resources.global_content_filter.include_input_prompt  and prompt == 'In' ) *))
+\prompt{(((prompt)))}{(((prompt_color)))}{(((execution_count)))}{(((extra_space)))}
+    ((*- endif -*))
+((*- endmacro *))
+
+You can find this in the share folder of the python environment.
+=))
+((*- block outputs scoped -*))
+    ((* if "highlight-output" in cell.metadata.tags *))
+        \begin{highlightedoutput}
+    ((* endif *))
+    ((( super() )))
+    ((* if "highlight-output" in cell.metadata.tags *))
+        \end{highlightedoutput}
+    ((* endif *))
+((*- endblock outputs -*))
 
 ((* block definitions *))
     ((( super() )))
