@@ -110,11 +110,11 @@ def create_model():
 model = create_model()
 
 # Initialize trainable variables a and b
-a = tf.Variable(1.5, dtype=tf.float32, name='a')
-b = tf.Variable(6.5, dtype=tf.float32, name='b')
+a = tf.Variable(2.5, dtype=tf.float32, name='a')
+b = tf.Variable(5.5, dtype=tf.float32, name='b')
 
 # Define the optimizer
-optimizer = Adam(learning_rate=0.005)
+optimizer = Adam(learning_rate=0.001)
 
 # ### Training Step
 # The total loss (sum of boundary and PDE losses) is minimized using the Adam optimizer. The gradients of the total loss with respect to the network's parameters and the constants $a$ and $b$ are computed and used to update these variables.
@@ -123,6 +123,7 @@ optimizer = Adam(learning_rate=0.005)
 
 
 pde_loss_weight = 1  # weight to emphasize PDE constraint
+analytic_loss_weight = 1  # weight to emphasize analytic constraint
 
 
 @tf.function
@@ -132,7 +133,7 @@ def train_step(X_bc_, u_bc_, X_pde_):
         u_pred_bc = model(X_bc_, training=True)
         bc_loss_ = tf.reduce_mean((u_bc_ - u_pred_bc)**2)
 
-        # PDE loss (as before) …
+        # PDE loss
         with tf.GradientTape(persistent=True) as tape2:
             tape2.watch(X_pde_)
             u_pred_pde = model(X_pde_, training=True)
@@ -149,11 +150,15 @@ def train_step(X_bc_, u_bc_, X_pde_):
         PDE_resid = u_xx + u_yy - rhs
         pde_loss_ = tf.reduce_mean(PDE_resid**2)
 
-        total_loss_ = bc_loss_ + pde_loss_weight*pde_loss_
+        # Analytic loss
+        u_analytic = tf.exp(-x_pde)*(x_pde + y_pde**3)
+        analytic_loss_ = tf.reduce_mean((u_analytic - u_pred_pde)**2)
+
+        total_loss_ = bc_loss_ + pde_loss_weight*pde_loss_ + analytic_loss_weight*analytic_loss_
 
     grads = tape.gradient(total_loss_, model.trainable_variables + [a, b])
     optimizer.apply_gradients(zip(grads, model.trainable_variables + [a, b]))
-    return bc_loss_, pde_loss_, total_loss_
+    return bc_loss_, pde_loss_, analytic_loss_, total_loss_
 
 
 # Now we can finish training and tracking the values of $a$ and $b$.
@@ -161,7 +166,7 @@ def train_step(X_bc_, u_bc_, X_pde_):
 # In[5]:
 
 
-epochs = 10_000
+epochs = 50_000
 a_history, b_history = [], []
 loss_history = []
 
@@ -171,12 +176,14 @@ for epoch in range(1, epochs + 1):
     y_f = np.random.rand(N_f, 1)
     X_pde_tf = tf.convert_to_tensor(np.hstack([x_f, y_f]), dtype=tf.float32)
 
-    bc_loss, pde_loss, total_loss = train_step(X_bc_tf, u_bc_tf, X_pde_tf)
+    bc_loss, pde_loss, analytical_loss, total_loss = train_step(X_bc_tf, u_bc_tf, X_pde_tf)
     a_history.append(a.numpy())
     b_history.append(b.numpy())
 
     if epoch%500 == 0:
-        print(f"Epoch {epoch:5d}  |  BC_loss = {bc_loss:.3e}  PDE_loss = {pde_loss:.3e} a = {a.numpy():.4f}  b = "
+        # print(f"Epoch {epoch:5d}  |  BC_loss = {bc_loss:.3e}  PDE_loss = {pde_loss:.3e} a = {a.numpy():.4f}  b = "
+        #       f"{b.numpy():.4f}")
+        print(f"Epoch {epoch:5d}  |  Total_loss = {total_loss:.3e}  a = {a.numpy():.4f}  b = "
               f"{b.numpy():.4f}")
 
 epoch_array = np.arange(1, epochs + 1)
